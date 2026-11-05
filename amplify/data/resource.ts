@@ -1,9 +1,13 @@
 import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
 
 const schema = a.schema({
-  Todo: a
+  EssayTemplate: a.enum(['MULTI_PARAGRAPH']),
+
+  Essay: a
     .model({
-      content: a.string(),
+      title: a.string().required(),
+      templateType: a.ref('EssayTemplate').required(),
+      content: a.json().required(),
     })
     .authorization((allow) => [allow.owner()]),
 });
