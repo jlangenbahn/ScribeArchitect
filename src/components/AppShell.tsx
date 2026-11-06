@@ -25,14 +25,17 @@ import { useTheme } from '@mui/material/styles';
 import type { AuthUser } from 'aws-amplify/auth';
 import { useEffect, useMemo, useState } from 'react';
 import { client, type EssayRecord } from '../lib/client';
-import { downloadMpeDocx } from '../lib/exportDocx';
+import { createEmptyDbq, parseDbqContent, type DbqContent } from '../lib/dbq';
+import { downloadDbqDocx, downloadMpeDocx } from '../lib/exportDocx';
 import {
   createEmptyMpe,
   displayTitle,
   parseMpeContent,
+  templateShortLabel,
   type EssayTemplateType,
   type MpeContent,
 } from '../lib/mpe';
+import DocumentBasedQuestion from './DocumentBasedQuestion';
 import MultiParagraphEssay from './MultiParagraphEssay';
 import TemplatePicker from './TemplatePicker';
 
@@ -49,6 +52,10 @@ type ToastState = {
   message: string;
   severity: 'success' | 'error';
 };
+
+type EditorDraft =
+  | { template: 'MULTI_PARAGRAPH'; content: MpeContent }
+  | { template: 'DOCUMENT_BASED_QUESTION'; content: DbqContent };
 
 function formatUpdatedAt(value?: string | null): string {
   if (!value) return '';
@@ -71,7 +78,7 @@ export default function AppShell({ user, signOut }: AppShellProps) {
   const [view, setView] = useState<'pick' | 'editor'>('pick');
   const [essayId, setEssayId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
-  const [content, setContent] = useState<MpeContent>(createEmptyMpe);
+  const [draft, setDraft] = useState<EditorDraft | null>(null);
   const [loadingEssay, setLoadingEssay] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<ToastState>({
@@ -110,19 +117,28 @@ export default function AppShell({ user, signOut }: AppShellProps) {
     setToast({ open: true, message, severity });
   }
 
+  function essaySecondary(essay: EssayRecord): string {
+    const when = formatUpdatedAt(essay.updatedAt);
+    const kind = templateShortLabel(essay.templateType);
+    return when ? `${kind} · ${when}` : kind;
+  }
+
   function startNewEssay() {
     setView('pick');
     setEssayId(null);
     setTitle('');
-    setContent(createEmptyMpe());
+    setDraft(null);
     setMobileOpen(false);
   }
 
   function handleTemplateSelect(template: EssayTemplateType) {
-    if (template !== 'MULTI_PARAGRAPH') return;
     setEssayId(null);
     setTitle('');
-    setContent(createEmptyMpe());
+    setDraft(
+      template === 'DOCUMENT_BASED_QUESTION'
+        ? { template, content: createEmptyDbq() }
+        : { template: 'MULTI_PARAGRAPH', content: createEmptyMpe() },
+    );
     setView('editor');
   }
 
@@ -138,7 +154,17 @@ export default function AppShell({ user, signOut }: AppShellProps) {
       }
       setEssayId(data.id);
       setTitle(data.title ?? '');
-      setContent(parseMpeContent(data.content));
+      setDraft(
+        data.templateType === 'DOCUMENT_BASED_QUESTION'
+          ? {
+              template: 'DOCUMENT_BASED_QUESTION',
+              content: parseDbqContent(data.content),
+            }
+          : {
+              template: 'MULTI_PARAGRAPH',
+              content: parseMpeContent(data.content),
+            },
+      );
     } catch {
       showToast('Could not open that essay.', 'error');
     } finally {
@@ -147,11 +173,12 @@ export default function AppShell({ user, signOut }: AppShellProps) {
   }
 
   async function saveEssay() {
+    if (!draft) return;
     setSaving(true);
     const payload = {
       title: displayTitle(title),
-      templateType: 'MULTI_PARAGRAPH' as const,
-      content,
+      templateType: draft.template,
+      content: draft.content,
     };
     try {
       if (essayId) {
@@ -181,8 +208,13 @@ export default function AppShell({ user, signOut }: AppShellProps) {
   }
 
   async function downloadEssay() {
+    if (!draft) return;
     try {
-      await downloadMpeDocx(title, content);
+      if (draft.template === 'DOCUMENT_BASED_QUESTION') {
+        await downloadDbqDocx(title, draft.content);
+      } else {
+        await downloadMpeDocx(title, draft.content);
+      }
     } catch {
       showToast('Could not download the Word file.', 'error');
     }
@@ -230,7 +262,7 @@ export default function AppShell({ user, signOut }: AppShellProps) {
             >
               <ListItemText
                 primary={displayTitle(essay.title)}
-                secondary={formatUpdatedAt(essay.updatedAt)}
+                secondary={essaySecondary(essay)}
                 slotProps={{
                   primary: { noWrap: true, sx: { fontWeight: 700 } },
                   secondary: { noWrap: true },
@@ -337,16 +369,32 @@ export default function AppShell({ user, signOut }: AppShellProps) {
             <Stack sx={{ py: 8, alignItems: 'center' }}>
               <CircularProgress />
             </Stack>
-          ) : (
-            <MultiParagraphEssay
+          ) : draft?.template === 'DOCUMENT_BASED_QUESTION' ? (
+            <DocumentBasedQuestion
               title={title}
-              content={content}
+              content={draft.content}
               saving={saving}
               onTitleChange={setTitle}
-              onContentChange={setContent}
+              onContentChange={(content) =>
+                setDraft({ template: 'DOCUMENT_BASED_QUESTION', content })
+              }
               onSave={saveEssay}
               onDownload={downloadEssay}
             />
+          ) : draft?.template === 'MULTI_PARAGRAPH' ? (
+            <MultiParagraphEssay
+              title={title}
+              content={draft.content}
+              saving={saving}
+              onTitleChange={setTitle}
+              onContentChange={(content) =>
+                setDraft({ template: 'MULTI_PARAGRAPH', content })
+              }
+              onSave={saveEssay}
+              onDownload={downloadEssay}
+            />
+          ) : (
+            <TemplatePicker onSelect={handleTemplateSelect} />
           )}
         </Box>
       </Box>

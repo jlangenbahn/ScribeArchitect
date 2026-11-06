@@ -1,7 +1,7 @@
 import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
 
 const schema = a.schema({
-  EssayTemplate: a.enum(['MULTI_PARAGRAPH']),
+  EssayTemplate: a.enum(['MULTI_PARAGRAPH', 'DOCUMENT_BASED_QUESTION']),
 
   Essay: a
     .model({

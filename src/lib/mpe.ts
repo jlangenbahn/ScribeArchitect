@@ -2,6 +2,12 @@ export const TEMPLATE_OPTIONS = [
   {
     value: 'MULTI_PARAGRAPH' as const,
     label: 'Multi-Paragraph Essay',
+    shortLabel: 'Multi-Paragraph',
+  },
+  {
+    value: 'DOCUMENT_BASED_QUESTION' as const,
+    label: 'Document-Based Question (DBQ)',
+    shortLabel: 'DBQ',
   },
 ];
 
@@ -10,13 +16,17 @@ export type EssayTemplateType = (typeof TEMPLATE_OPTIONS)[number]['value'];
 export type SentenceKind =
   | 'hook'
   | 'bridge'
+  | 'context'
   | 'thesis'
   | 'ts'
   | 'cd'
   | 'cm'
   | 'cs'
+  | 'hipp'
+  | 'outsideEvidence'
   | 'restatedThesis'
   | 'summary'
+  | 'complexity'
   | 'clincher';
 
 export const SENTENCE_COLORS: Record<
@@ -25,13 +35,17 @@ export const SENTENCE_COLORS: Record<
 > = {
   hook: { main: '#b45309', bg: '#fff7ed' },
   bridge: { main: '#0f766e', bg: '#f0fdfa' },
+  context: { main: '#0f766e', bg: '#f0fdfa' },
   thesis: { main: '#6d28d9', bg: '#f5f3ff' },
   ts: { main: '#15803d', bg: '#f0fdf4' },
   cd: { main: '#111827', bg: '#f8fafc' },
   cm: { main: '#1d4ed8', bg: '#eff6ff' },
   cs: { main: '#c2410c', bg: '#fff7ed' },
+  hipp: { main: '#b45309', bg: '#fff7ed' },
+  outsideEvidence: { main: '#4338ca', bg: '#eef2ff' },
   restatedThesis: { main: '#a21caf', bg: '#fdf4ff' },
   summary: { main: '#334155', bg: '#f8fafc' },
+  complexity: { main: '#be123c', bg: '#fff1f2' },
   clincher: { main: '#be123c', bg: '#fff1f2' },
 };
 
@@ -181,4 +195,9 @@ export function parseMpeContent(raw: unknown): MpeContent {
 export function displayTitle(title?: string | null): string {
   const trimmed = String(title ?? '').trim();
   return trimmed || 'Untitled essay';
+}
+
+export function templateShortLabel(value?: string | null): string {
+  const match = TEMPLATE_OPTIONS.find((option) => option.value === value);
+  return match?.shortLabel ?? 'Essay';
 }

@@ -27,8 +27,8 @@ export default function TemplatePicker({ onSelect }: TemplatePickerProps) {
         <Stack spacing={0.75}>
           <Typography variant="h5">Write an essay</Typography>
           <Typography color="text.secondary">
-            Choose a template to open a structured draft. Multi-Paragraph Essay
-            is available now; more templates will be added later.
+            Choose a template to open a color-coded draft you can save and
+            download.
           </Typography>
         </Stack>
         <FormControl fullWidth>
@@ -43,7 +43,8 @@ export default function TemplatePicker({ onSelect }: TemplatePickerProps) {
             value=""
             onChange={(event) => {
               const next = String(event.target.value);
-              if (next === 'MULTI_PARAGRAPH') onSelect(next);
+              const match = TEMPLATE_OPTIONS.find((option) => option.value === next);
+              if (match) onSelect(match.value);
             }}
           >
             <MenuItem value="">

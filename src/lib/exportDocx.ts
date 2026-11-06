@@ -6,6 +6,12 @@ import {
   TextRun,
 } from 'docx';
 import {
+  hippLabel,
+  type DbqBodyParagraph,
+  type DbqContent,
+  type DbqDocument,
+} from './dbq';
+import {
   displayTitle,
   type BodyParagraph,
   type MpeContent,
@@ -86,6 +92,102 @@ function bodySection(paragraph: BodyParagraph, index: number): Paragraph[] {
   return blocks.filter((block): block is Paragraph => block !== null);
 }
 
+function documentBlock(source: DbqDocument, index: number): Paragraph[] {
+  const blocks = [
+    labeledSentence('Evidence from the document', source.content, 'cd'),
+    labeledSentence('Use in the argument', source.argumentLink, 'cm'),
+    labeledSentence(
+      source.hippElement
+        ? `Sourcing — ${hippLabel(source.hippElement)}`
+        : 'Sourcing (HIPP)',
+      source.hippExplanation,
+      'hipp',
+    ),
+  ].filter((block): block is Paragraph => block !== null);
+
+  if (blocks.length === 0) return [];
+
+  return [
+    new Paragraph({
+      spacing: { before: 160, after: 80 },
+      children: [
+        new TextRun({
+          text: source.label.trim() || `Document ${index + 1}`,
+          bold: true,
+        }),
+      ],
+    }),
+    ...blocks,
+  ];
+}
+
+function dbqBodySection(paragraph: DbqBodyParagraph, index: number): Paragraph[] {
+  const blocks: Array<Paragraph | null> = [
+    heading(`Body Paragraph ${index + 1}`),
+    labeledSentence('Topic Sentence', paragraph.topicSentence, 'ts'),
+    ...paragraph.documents.flatMap(documentBlock),
+    labeledSentence('Outside evidence', paragraph.outsideEvidence, 'outsideEvidence'),
+    labeledSentence(
+      'How the outside evidence supports the argument',
+      paragraph.outsideEvidenceLink,
+      'outsideEvidence',
+    ),
+    labeledSentence('Concluding Sentence', paragraph.concludingSentence, 'cs'),
+  ];
+
+  return blocks.filter((block): block is Paragraph => block !== null);
+}
+
+async function saveDocx(doc: Document, title: string) {
+  const blob = await Packer.toBlob(doc);
+  const slug = displayTitle(title)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')
+    .slice(0, 60);
+  const anchor = document.createElement('a');
+  anchor.href = URL.createObjectURL(blob);
+  anchor.download = `${slug || 'scribe-architect-essay'}.docx`;
+  anchor.click();
+  URL.revokeObjectURL(anchor.href);
+}
+
+export async function downloadDbqDocx(title: string, content: DbqContent) {
+  const intro = content.introduction;
+  const conclusion = content.conclusion;
+  const children = [
+    new Paragraph({
+      text: displayTitle(title),
+      heading: HeadingLevel.TITLE,
+      spacing: { after: 200 },
+    }),
+    labeledSentence('DBQ prompt', content.prompt, 'summary'),
+    heading('Introduction'),
+    labeledSentence(
+      'Contextualization — broader setting',
+      intro.contextualization,
+      'context',
+    ),
+    labeledSentence(
+      'Contextualization — link to the prompt',
+      intro.contextualizationLink,
+      'context',
+    ),
+    labeledSentence('Thesis / Claim', intro.thesis, 'thesis'),
+    ...content.bodyParagraphs.flatMap(dbqBodySection),
+    heading('Conclusion'),
+    labeledSentence('Restated Thesis / Claim', conclusion.restatedThesis, 'restatedThesis'),
+    labeledSentence('Complexity', conclusion.complexity, 'complexity'),
+  ].filter((block): block is Paragraph => block !== null);
+
+  await saveDocx(
+    new Document({
+      sections: [{ properties: {}, children }],
+    }),
+    title,
+  );
+}
+
 export async function downloadMpeDocx(title: string, content: MpeContent) {
   const intro = content.introduction;
   const conclusion = content.conclusion;
@@ -110,24 +212,10 @@ export async function downloadMpeDocx(title: string, content: MpeContent) {
     labeledSentence('The Clincher', conclusion.clincher, 'clincher'),
   ].filter((block): block is Paragraph => block !== null);
 
-  const doc = new Document({
-    sections: [
-      {
-        properties: {},
-        children,
-      },
-    ],
-  });
-
-  const blob = await Packer.toBlob(doc);
-  const slug = displayTitle(title)
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '')
-    .slice(0, 60);
-  const anchor = document.createElement('a');
-  anchor.href = URL.createObjectURL(blob);
-  anchor.download = `${slug || 'scribe-architect-essay'}.docx`;
-  anchor.click();
-  URL.revokeObjectURL(anchor.href);
+  await saveDocx(
+    new Document({
+      sections: [{ properties: {}, children }],
+    }),
+    title,
+  );
 }
